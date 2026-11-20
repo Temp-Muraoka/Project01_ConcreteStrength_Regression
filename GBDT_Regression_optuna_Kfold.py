@@ -1,6 +1,6 @@
 """
 Optunaを用いたハイパーパラメータチューニング
-NN_Classification_pytorch.pyのモデルを対象
+GBDT_Regression.pyのモデルを対象
 
 交差検証法
 
@@ -9,8 +9,7 @@ NN_Classification_pytorch.pyのモデルを対象
 import pandas as pd
 import numpy as np
 import time
-import joblib
-import matplotlib.pyplot as plt
+
 from pathlib import Path
 
 from sklearn.model_selection import train_test_split
@@ -29,17 +28,9 @@ import os
 TRIAL_N = 500 #探索回数
 N_SPLITS = 5    # 交差検証の分割数
 
-# HIDDEN_LAYERS = [32, 16]
-
-# LEARNING_RATE = 0.001
-
-# EPOCHS = 100 #Earlystoppingするので、十分大きい数
-
-# DROPOUT_RATE = 0.0
 
 # Early Stopping
 PATIENCE = 5       # 検証Lossが改善しないことを許容するエポック数
-
 
 
 # ==========================================
@@ -101,7 +92,7 @@ def objective(trial):
                 'random_state': 42,
                 'verbose': -1,
                 
-                # チューニング対象パラメータ（対数変数は霧の良い数値のみ）
+                # チューニング対象パラメータ（対数変数はキリの良い数値のみ）
                 'learning_rate': trial.suggest_categorical('learning_rate', [0.001, 0.005, 0.01, 0.05, 0.1]),
                 'num_leaves': trial.suggest_int('num_leaves', 15, 127),
                 'max_depth': trial.suggest_int('max_depth', 3, 10),

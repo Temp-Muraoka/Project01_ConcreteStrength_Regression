@@ -23,12 +23,12 @@ import lightgbm as lgb
 # ============================================================
 RANDOM_STATE = 42
 
-# Early Stopping
-PATIENCE = 5       
-PERIOD = 10 #表示頻度
+# # Early Stopping
+# PATIENCE = 5       
+# PERIOD = 10 #表示頻度
 
-LEARNING_RATE = 0.05
-ESTIMATORS = 1000
+# LEARNING_RATE = 0.05
+# ESTIMATORS = 1000
 
 
 # ==========================================
@@ -66,30 +66,84 @@ X_train, X_test, Y_train, Y_test = train_test_split(
     random_state=42
 )
 
+# LightGBM Datasetの作成
+lgb_train = lgb.Dataset(X_train, label=Y_train)
+# lgb_valid = lgb.Dataset(X_va, label=Y_va, reference=lgb_train)
 
 # # 標準化(決定木モデルは無意味)
 # scaler = StandardScaler()
 # X_train = scaler.fit_transform(X_train)
 # X_test = scaler.transform(X_test)
 
-
+start_time = time.perf_counter()
 
 # ============================================================
 # Initialize Model
 # ============================================================
 
-model = lgb.LGBMRegressor(
-    random_state=RANDOM_STATE,
-    n_estimators=ESTIMATORS, # 木の本数（Early Stoppingと併用するため多めに設定）
-    learning_rate=LEARNING_RATE,  # 学習率       
-    num_leaves=31,               # 葉の最大数
-    max_depth=-1,                # 木の深さ(-1制限なし)
-    min_child_samples=20,        # 葉の最小データ数
-    subsample=0.8,               # データ（行）のサンプリング率
-    colsample_bytree=0.8,        # 特徴量（列）のサンプリング率
-    reg_alpha=0.1,               # L1正則化（0~10 対数）
-    reg_lambda=0.1,              # L2正則化（0~10 対数）
+params = {
+            "objective": "regression",
+            'num_class': OUTPUT_DIM,
+            'metric': 'rmse',
+            'boosting_type': 'gbdt',
+            'random_state': 42,
+            'verbose': -1,
+            
+            # チューニング後のパラメータ
+            'learning_rate': 0.1,
+            'num_leaves': 19,
+            'max_depth': 7,
+            'min_child_samples': 15,
+            'subsample': 0.85,
+            'colsample_bytree': 0.71,
+            'reg_alpha': 1,
+            'reg_lambda': 0.01,
+            }
+
+# 履歴保存用の空辞書
+evals_result = {}
+
+callbacks = [
+    # lgb.early_stopping(stopping_rounds=PATIENCE, verbose=False),
+    lgb.log_evaluation(period=0), # 学習中の標準出力を抑制
+    lgb.record_evaluation(evals_result) # 履歴を記録
+]
+
+model = lgb.train(
+    params,
+    lgb_train,
+    num_boost_round=200,
+    valid_sets=[lgb_train],
+    valid_names=['training'],
+    callbacks=callbacks,
 )
+
+# 違う書き方
+# model = lgb.LGBMRegressor(
+#     random_state=RANDOM_STATE,
+#     n_estimators=ESTIMATORS, # 木の本数（Early Stoppingと併用するため多めに設定）
+#     learning_rate=LEARNING_RATE,  # 学習率       
+#     num_leaves=31,               # 葉の最大数
+#     max_depth=-1,                # 木の深さ(-1制限なし)
+#     min_child_samples=20,        # 葉の最小データ数
+#     subsample=0.8,               # データ（行）のサンプリング率
+#     colsample_bytree=0.8,        # 特徴量（列）のサンプリング率
+#     reg_alpha=0.1,               # L1正則化（0~10 対数）
+#     reg_lambda=0.1,              # L2正則化（0~10 対数）
+# )
+# # Early Stopping とログ出力を設定
+# # eval_setの最後のデータセットに対して評価される。
+# callbacks = [
+#             lgb.early_stopping(stopping_rounds=PATIENCE, verbose=False),
+#             # lgb.log_evaluation(period=PERIOD)
+#             ]
+
+# model.fit(
+#           X_train, Y_train,
+#           eval_set=[(X_train, Y_train), (X_test, Y_test)],  # result出力させたいデータセット。0番目に訓練、1番目に検証
+#           eval_metric="rmse",
+#           callbacks=callbacks
+#           )
 
 
 print("\nModel Structure:")
@@ -99,23 +153,7 @@ print(model)
 # ==========================================
 # 4. 学習ループ (Early Stopping含む)
 # ==========================================
-start_time = time.perf_counter()
 
-print("--- 学習開始 ---")
-
-# Early Stopping とログ出力を設定
-# eval_setの最後のデータセットに対して評価される。
-callbacks = [
-            lgb.early_stopping(stopping_rounds=PATIENCE, verbose=False),
-            # lgb.log_evaluation(period=PERIOD)
-            ]
-
-model.fit(
-          X_train, Y_train,
-          eval_set=[(X_train, Y_train), (X_test, Y_test)],  # result出力させたいデータセット。0番目に訓練、1番目に検証
-          eval_metric="rmse",
-          callbacks=callbacks
-          )
 
 print("--- 学習完了 ---")
 
@@ -146,30 +184,35 @@ print(f"モデルを保存しました: {model_save_path}")
 # ==========================================
 # 6. 学習曲線の描画
 # ==========================================
-evals_result = model.evals_result_
-print(evals_result.keys()) #キー項目名確認
-
-fig, axes = plt.subplots(1, 1, figsize=(6, 4))
-
-# Loss (Multi-Logloss)
-axes.plot(
-    evals_result['training']['rmse'],
-    label="Train rmse"
-)
-
-axes.plot(
-    evals_result['valid_1']['rmse'],
-    label="Validation rmse"
-)
-
-axes.set_title("LightGBM Training & Validation Loss")
-axes.set_xlabel("Boosting Iteration")
-axes.set_ylabel("Loss")
-axes.legend()
-axes.grid()
-
-plt.tight_layout()
+lgb.plot_metric(evals_result, metric='rmse')
+plt.title('Full Data Learning Curve')
 plt.show()
+
+
+# evals_result = model.evals_result_
+# print(evals_result.keys()) #キー項目名確認
+
+# fig, axes = plt.subplots(1, 1, figsize=(6, 4))
+
+# # Loss (Multi-Logloss)
+# axes.plot(
+#     evals_result['training']['rmse'],
+#     label="Train rmse"
+# )
+
+# # axes.plot(
+# #     evals_result['valid_1']['rmse'],
+# #     label="Validation rmse"
+# # )
+
+# axes.set_title("LightGBM Training & Validation Loss")
+# axes.set_xlabel("Boosting Iteration")
+# axes.set_ylabel("Loss")
+# axes.legend()
+# axes.grid()
+
+# plt.tight_layout()
+# plt.show()
 
 # ==========================================
 # 正解-予測プロット
