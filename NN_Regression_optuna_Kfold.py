@@ -357,12 +357,6 @@ df_trials = study.trials_dataframe()
 df_trials.to_csv(csv_path, index=False, encoding="utf-8-sig")
 
 
-print("\nハイパーパラメータチューニング完了！")
-print(f"ベスト評価値: {study.best_value:.4f}")
-print("ベストパラメータ:")
-for key, val in study.best_params.items():
-    print(f"  - {key}: {val}")
-print(f"履歴保存先: {csv_path}")
 
 # --- 最も良かったTrialから情報を取得 ---
 best_trial = study.best_trial
@@ -380,6 +374,8 @@ print(f"ベスト訓練 Loss: {best_train_loss:.4f}")
 print("ベストパラメータ:")
 for key, val in best_trial.params.items():
     print(f"  - {key}: {val}")
+
+print(f"履歴保存先: {csv_path}")
 
 elapsed_time = time.perf_counter() - start_time
 

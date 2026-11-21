@@ -23,14 +23,14 @@ from torch.utils.data import DataLoader, TensorDataset
 # Setting
 # ============================================================
 
-HIDDEN_LAYERS = [248, 216]
+HIDDEN_LAYERS = [224, 208, 192]
 # HIDDEN_LAYERS = [32, 16]
 
 LEARNING_RATE = 0.001
 
 EPOCHS = 300
 
-DROPOUT_RATE = 0.2
+DROPOUT_RATE = 0.0
 
 # Early Stopping
 PATIENCE = 5       # 検証Lossが改善しないことを許容するエポック数
