@@ -10,10 +10,11 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import time
 import copy
+from pathlib import Path
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -22,7 +23,7 @@ from torch.utils.data import DataLoader, TensorDataset
 # Setting
 # ============================================================
 
-HIDDEN_LAYERS = [128]
+HIDDEN_LAYERS = [32, 16]
 # HIDDEN_LAYERS = [32, 16]
 
 LEARNING_RATE = 0.001
@@ -109,8 +110,8 @@ OUTPUT_DIM = 1
 
 
 # NumPy配列に変換
-X = X.values.astype(np.float32)
-Y = Y.astype(np.float32)
+X = X.to_numpy().astype(np.float32)
+Y = Y.to_numpy().astype(np.float32)
 
 
 print(f"Number of samples: {len(X)}")
@@ -131,10 +132,10 @@ X_test = scaler.transform(X_test)
 
 # Tensorに変換（ここでGPU転送もできるが、データ量多い場合メモリ不足する。ここではbachごと伝送）
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-Y_train_tensor = torch.tensor(Y_train, dtype=torch.long)
+Y_train_tensor = torch.tensor(Y_train, dtype=torch.float32).reshape(-1, 1)
 
 X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
-Y_test_tensor = torch.tensor(Y_test, dtype=torch.long)
+Y_test_tensor = torch.tensor(Y_test, dtype=torch.float32).reshape(-1, 1)
 
 # DataLoader
 # 入力、出力をペアにする。画像など型が違ってもペアにできる
@@ -177,10 +178,8 @@ start_time = time.perf_counter()
 print("--- 学習開始 ---")
 
 history = { 
-            "train_loss": [],
-            "valid_loss": [],
-            "train_acc": [],
-            "valid_acc": []
+            "train_rmse": [],
+            "valid_rmse": [],
             }
 
 # Early Stopping用の変数
@@ -196,7 +195,6 @@ for epoch in range(EPOCHS):
     model.train()
 
     train_loss = 0.0
-    train_correct = 0  # GPU上で正解率計算のために使用
 
     all_predictions = []
     all_targets = []
@@ -217,29 +215,22 @@ for epoch in range(EPOCHS):
 
         optimizer.step()
 
+        # バッチ内の平均MSEに「そのバッチのデータ数」を掛けて、二乗誤差の合計に戻す
+        # .item() をつけることで計算グラフを切り離しメモリリークを防ぐ
         train_loss += loss.item() * batch_X.size(0)
 
-        predictions = outputs.argmax(dim=1)
+     # 全データ数で割って全体のMSEを出し、最後に1回だけルートをとってRMSEにする
+    train_mse = train_loss / len(train_loader.dataset)
+    train_rmse = train_mse ** 0.5
 
-        train_correct += (predictions == batch_y).sum().item()
-
-        # all_predictions.extend(predictions.cpu().numpy())
-        # all_targets.extend(batch_y.cpu().numpy())
-
-    train_loss /= len(train_loader.dataset)
-
-    train_acc = train_correct / len(train_loader.dataset)
-    # train_acc = accuracy_score(all_targets,all_predictions)
-
-    history["train_loss"].append(train_loss)
-    history["train_acc"].append(train_acc)
+    history["train_rmse"].append(train_rmse)
 
 
     # ----- Validation -----
     model.eval()
 
     valid_loss = 0.0
-    valid_correct = 0
+
     all_predictions = []
     all_targets = []
 
@@ -256,20 +247,10 @@ for epoch in range(EPOCHS):
             loss = criterion(outputs, batch_y)
 
             valid_loss += loss.item() * batch_X.size(0)
-
-            predictions = outputs.argmax(dim=1)
-
-            valid_correct += (predictions == batch_y).sum().item()
-            # all_predictions.extend(predictions.cpu().numpy())    
-            # all_targets.extend(batch_y.cpu().numpy())
     
-        valid_loss /= len(test_loader.dataset)
-
-        valid_acc = valid_correct / len(test_loader.dataset)
-        # valid_acc = accuracy_score(all_targets,all_predictions)
-    
-        history["valid_loss"].append(valid_loss)
-        history["valid_acc"].append(valid_acc)
+        valid_mse = valid_loss / len(test_loader.dataset)
+        valid_rmse = valid_mse ** 0.5
+        history["valid_rmse"].append(valid_rmse)
 
 
     # 10エポックごとに表示
@@ -277,10 +258,8 @@ for epoch in range(EPOCHS):
 
         print(
             f"Epoch [{epoch+1}/{EPOCHS}] "
-            f"Train Loss: {train_loss:.4f} | "
-            f"Valid Loss: {valid_loss:.4f} | "
-            f"Train Acc: {train_acc:.4f} | "
-            f"Valid Acc: {valid_acc:.4f}"
+            f"Train Loss: {train_rmse:.4f} | "
+            f"Valid Loss: {valid_rmse:.4f} | "
         )
 
     # ----- Early Stopping -----
@@ -315,6 +294,11 @@ print(f"処理時間: {elapsed_time:.2f}秒")
 # ==========================================
 # 5. 学習済みモデルの保存
 # ==========================================
+model_save_path = "./results/NN/NN_model.pth"
+
+# 保存先ディレクトリを自動作成
+Path(model_save_path).parent.mkdir(parents=True, exist_ok=True)
+
 
 torch.save(
     {
@@ -323,11 +307,10 @@ torch.save(
         "hidden_dims": HIDDEN_LAYERS,
         "output_dim": OUTPUT_DIM,
         "drop_rate": DROPOUT_RATE,
-        "classes": encoder.classes_,
         "scaler_mean": scaler.mean_,
         "scaler_scale": scaler.scale_,
     },
-    "./data/Dry_Bean_Dataset/dry_bean_model.pth"
+    model_save_path
 )
 
 print("モデルを保存しました。")
@@ -337,90 +320,128 @@ print("モデルを保存しました。")
 # 6. 学習曲線の描画
 # ==========================================
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+fig, axes = plt.subplots(figsize=(7, 7))
 
 # Loss
-axes[0].plot(
-    history["train_loss"],
+axes.plot(
+    history["train_rmse"],
     label="Train Loss"
 )
 
-axes[0].plot(
-    history["valid_loss"],
+axes.plot(
+    history["valid_rmse"],
     label="Validation Loss"
 )
 
-axes[0].set_title("Loss")
-axes[0].set_xlabel("Epoch")
-axes[0].set_ylabel("Loss")
-axes[0].legend()
-axes[0].grid()
+axes.set_title("Loss")
+axes.set_xlabel("Epoch")
+axes.set_ylabel("Loss")
+axes.legend()
+axes.grid()
 
-# Accuracy
-axes[1].plot(
-    history["train_acc"],
-    label="Train Accuracy"
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+# ==========================================
+# 正解-予測プロット
+# ==========================================
+
+model.eval()
+
+# 予測
+y_train_pred = model(X_train_tensor.to(device)).cpu().numpy()
+y_test_pred = model(X_test_tensor.to(device)).cpu().numpy()
+
+fig, ax = plt.subplots(figsize=(7, 7))
+
+# 学習データ
+ax.scatter(
+    Y_train, y_train_pred,
+    alpha=0.5,
+    label="Train"
 )
 
-axes[1].plot(
-    history["valid_acc"],
-    label="Validation Accuracy"
+# テストデータ
+ax.scatter(
+    Y_test, y_test_pred,
+    alpha=0.7,
+    label="Test"
 )
 
-axes[1].set_title("Accuracy")
-axes[1].set_xlabel("Epoch")
-axes[1].set_ylabel("Accuracy")
-axes[1].legend()
-axes[1].grid()
+# y = x の基準線
+min_val = min(
+    np.min(Y_train), np.min(y_train_pred),
+    np.min(Y_test), np.min(y_test_pred)
+)
+max_val = max(
+    np.max(Y_train), np.max(y_train_pred),
+    np.max(Y_test), np.max(y_test_pred)
+)
+
+ax.plot(
+    [min_val, max_val],
+    [min_val, max_val],
+    "k--",
+    label="Ideal prediction"
+)
+
+ax.set_xlabel("Actual")
+ax.set_ylabel("Predicted")
+ax.set_title("Actual vs Predicted")
+
+ax.set_xlim(min_val, max_val)
+ax.set_ylim(min_val, max_val)
+
+ax.set_aspect("equal", adjustable="box")
+ax.legend()
+ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
 plt.show()
 
 
 # ==========================================
-# 7. 検証データの予測・精度評価
+# 7. データの精度評価
 # ==========================================
 
-model.eval()
+train_rmse = np.sqrt(mean_squared_error(Y_train, y_train_pred))
+test_rmse = np.sqrt(mean_squared_error(Y_test, y_test_pred))
+train_mae = mean_absolute_error(Y_train, y_train_pred)
+test_mae = mean_absolute_error(Y_test, y_test_pred)
+train_r2 = r2_score(Y_train, y_train_pred)
+test_r2 = r2_score(Y_test, y_test_pred)
 
-with torch.no_grad():
-
-    # .to(device)
-    X_test_tensor = X_test_tensor.to(device)
-
-    outputs = model(X_test_tensor)
-
-    # 最も確率の高いクラスを取得
-    predicted_classes = outputs.argmax(dim=1)
-
-    # ここで1回だけCPUのNumPy配列に変換して使い回す
-    pred_np = predicted_classes.cpu().numpy()  
-
-    accuracy = accuracy_score(Y_test, pred_np)
+print(f"--- 精度評価 ---")
+print(f"RMSE :  train {train_rmse:.4f}   test {test_rmse:.4f}")
+print(f"MAE  :  train {train_mae:.4f}    test {test_mae:.4f}")
+print(f"R2   :  train {train_r2:.4f}     teat {test_r2:.4f}")
 
 
-print(f"Validation Accuracy: {accuracy * 100:.2f}%")
 
 
-# ==========================================
-# 8. 予測結果の保存
-# ==========================================
+# # ==========================================
+# # 8. 予測結果の保存
+# # ==========================================
 
-predicted_labels = encoder.inverse_transform(pred_np)
+# predicted_labels = encoder.inverse_transform(pred_np)
 
-result_df = pd.DataFrame({
+# result_df = pd.DataFrame({
 
-    "Actual": encoder.inverse_transform(Y_test),
+#     "Actual": encoder.inverse_transform(Y_test),
 
-    "Predicted": predicted_labels
+#     "Predicted": predicted_labels
 
-})
+# })
 
-result_df.to_csv(
-    "./data/Dry_Bean_Dataset/predictions.csv",
-    index=False,
-    encoding="utf-8-sig"
-)
+# result_df.to_csv(
+#     "./data/Dry_Bean_Dataset/predictions.csv",
+#     index=False,
+#     encoding="utf-8-sig"
+# )
 
-print(result_df.head())
-print("予測結果を保存しました。")
+# print(result_df.head())
+# print("予測結果を保存しました。")
