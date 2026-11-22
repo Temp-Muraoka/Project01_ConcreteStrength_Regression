@@ -42,6 +42,8 @@ def Optimize_lightGBM(trial_num, X_train, Y_train, CV_num=5):
                     'boosting_type': 'gbdt',
                     'random_state': RANDOM_STATE,
                     'verbose': -1,
+
+                    "n_estimators": 1000,
                     
                     # チューニング対象パラメータ（対数変数はキリの良い数値のみ）
                     'learning_rate': trial.suggest_categorical('learning_rate', [0.001, 0.005, 0.01, 0.05, 0.1]),

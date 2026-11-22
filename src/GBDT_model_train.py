@@ -10,19 +10,18 @@ import joblib
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
 
 import lightgbm as lgb
 
+# 自作関数
 from src.Data_load_And_Preprocess import data_load_and_preprocess
-from src.plot_graph import Plot_actual_vs_predict
+from src.utils import Plot_actual_vs_predict
 
 
 # Setting
 RANDOM_STATE = 42
-PATIENCE = 5
+PATIENCE = 5 #Early Stoppingの停止基準（改善しない回数）
 
 
 def GBDT_train(params, X_train, Y_train, X_valid=None, Y_valid=None):
