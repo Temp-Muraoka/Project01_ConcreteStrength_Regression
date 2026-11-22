@@ -59,7 +59,7 @@ def Plot_actual_vs_predict(Y_train,y_train_pred,Y_test,y_test_pred):
 # ==========================================
 # データの精度評価
 # ==========================================
-def evaluation_(Y_train, y_train_pred, Y_test, y_test_pred):
+def evaluation_model(Y_train, y_train_pred, Y_test, y_test_pred):
 
     train_rmse = np.sqrt(mean_squared_error(Y_train, y_train_pred))
     test_rmse = np.sqrt(mean_squared_error(Y_test, y_test_pred))
