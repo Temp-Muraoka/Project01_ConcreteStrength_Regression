@@ -1,5 +1,5 @@
 """
-勾配ブースティング決定木を用いた分類モデル
+勾配ブースティング決定木を用いた回帰モデル
 LightGBM使用
 """
 
@@ -10,27 +10,31 @@ import joblib
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 import lightgbm as lgb
 
-from Data_load_And_Preprocess import data_load_and_preprocess
+from src.Data_load_And_Preprocess import data_load_and_preprocess
+from src.plot_graph import Plot_actual_vs_predict
 
 
 # Setting
-
 RANDOM_STATE = 42
-
 PATIENCE = 5
 
 
 def GBDT_train(params, X_train, Y_train, X_valid=None, Y_valid=None):
     
+    if Y_train.shape[1]==1:
+        Y_train = Y_train.ravel()
+        if Y_valid is not None: Y_valid = Y_valid.ravel()
 
-    eval_sets = [(X_train, Y_train)]
+    # 注:タプルでX,Y分けて渡す書き方が現行推奨
+    # 要素一つのタプルは末尾","必要
+    eval_X_set = (X_train,)
+    eval_Y_set = (Y_train,)
 
     # 履歴保存用の空辞書
     evals_result = {}
@@ -43,7 +47,8 @@ def GBDT_train(params, X_train, Y_train, X_valid=None, Y_valid=None):
 
     # 注:パラメータ調整後の最終的なモデル学習時は検証データなし
     if X_valid is not None:
-        eval_sets.append((X_valid, Y_valid))
+        eval_X_set += (X_valid,)
+        eval_Y_set += (Y_valid,)
         callbacks.append(lgb.early_stopping(stopping_rounds=PATIENCE, verbose=False))
 
 
@@ -51,7 +56,8 @@ def GBDT_train(params, X_train, Y_train, X_valid=None, Y_valid=None):
 
     model.fit(
         X_train, Y_train,
-        eval_set=eval_sets,
+        eval_X=eval_X_set,
+        eval_y=eval_Y_set,
         callbacks=callbacks
     )
 
@@ -62,15 +68,13 @@ if __name__=="__main__":
 
     X_train, X_test, Y_train, Y_test = data_load_and_preprocess()
 
-    # クラス数
-    OUTPUT_DIM = Y_train.shape[1]
 
     start_time = time.perf_counter()
 
 
     params = {
                 "objective": "regression",
-                'num_class': OUTPUT_DIM,
+                'num_class': Y_train.shape[1],
                 'metric': 'rmse',
                 'boosting_type': 'gbdt',
                 'random_state': RANDOM_STATE,
@@ -90,7 +94,7 @@ if __name__=="__main__":
                 }
 
 
-    model = GBDT_train(params, X_train, Y_train)
+    model = GBDT_train(params, X_train, Y_train, X_test, Y_test)
 
     
     print("--- 学習完了 ---")
@@ -111,7 +115,7 @@ if __name__=="__main__":
         {
             "model": model,
             "input_dim": X_train.shape[1],
-            "output_dim": OUTPUT_DIM,
+            "output_dim": Y_train.shape[1],
         },
         model_save_path
     )
@@ -134,52 +138,9 @@ if __name__=="__main__":
     y_train_pred = model.predict(X_train)
     y_test_pred = model.predict(X_test)
 
-    fig, ax = plt.subplots(figsize=(7, 7))
+    Plot_actual_vs_predict(Y_train,y_train_pred,Y_test,y_test_pred)
 
-    # 学習データ
-    ax.scatter(
-        Y_train, y_train_pred,
-        alpha=0.5,
-        label="Train"
-    )
-
-    # テストデータ
-    ax.scatter(
-        Y_test, y_test_pred,
-        alpha=0.7,
-        label="Test"
-    )
-
-    # y = x の基準線
-    min_val = min(
-        np.min(Y_train), np.min(y_train_pred),
-        np.min(Y_test), np.min(y_test_pred)
-    )
-    max_val = max(
-        np.max(Y_train), np.max(y_train_pred),
-        np.max(Y_test), np.max(y_test_pred)
-    )
-
-    ax.plot(
-        [min_val, max_val],
-        [min_val, max_val],
-        "k--",
-        label="Ideal prediction"
-    )
-
-    ax.set_xlabel("Actual")
-    ax.set_ylabel("Predicted")
-    ax.set_title("Actual vs Predicted")
-
-    ax.set_xlim(min_val, max_val)
-    ax.set_ylim(min_val, max_val)
-
-    ax.set_aspect("equal", adjustable="box")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.show()
+    
 
     # ==========================================
     # データの精度評価
