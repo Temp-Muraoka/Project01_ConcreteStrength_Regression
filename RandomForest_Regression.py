@@ -1,7 +1,3 @@
-"""
-勾配ブースティング決定木を用いた分類モデル
-LightGBM使用
-"""
 
 import pandas as pd
 import numpy as np
