@@ -75,25 +75,9 @@ class NeuralNetwork(nn.Module):
 
 
 
-def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_tensor=None):
+def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_tensor=None, log_disp=False):
 
     device = params["device"]
-
-    # # 標準化
-    # scaler_x = StandardScaler()
-    # X_train = scaler_x.fit_transform(X_train)
-    # X_test = scaler_x.transform(X_test)
-
-    # scaler_y = StandardScaler()
-    # Y_train_scaled = scaler_y.fit_transform(Y_train)
-    # Y_test_scaled = scaler_y.transform(Y_test)
-
-    # Tensorに変換（ここでGPU転送もできるが、データ量多い場合メモリ不足する。ここではbachごと伝送）
-    # X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
-    # Y_train_tensor = torch.tensor(Y_train_scaled, dtype=torch.float32)
-
-    # X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
-    # Y_test_tensor = torch.tensor(Y_test_scaled, dtype=torch.float32)
 
     # DataLoader
     # 入力、出力をペアにする。画像など型が違ってもペアにできる
@@ -116,8 +100,10 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
                         dropout_rate=params["dropout_rate"]
                         ).to(device)
 
-    print("\nModel Structure:")
-    print(model)
+    if log_disp:
+        print("\nModel Structure:")
+        print(model)
+
 
     # Loss Function and Optimizer
 
@@ -129,10 +115,6 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
     # ==========================================
     # 4. 学習ループ
     # ==========================================
-
-    start_time = time.perf_counter()
-
-    print("--- 学習開始 ---")
 
     history = { 
                 "train_rmse": [],
@@ -216,7 +198,7 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
             print(
                 f"Epoch [{epoch+1}/{params['epochs']}] "
                 f"Train Loss: {train_rmse:.4f} | "
-                f"Valid Loss: {valid_rmse:.4f} | "
+                f"Valid Loss: {valid_rmse:.4f} | ", end="\r", flush=True
             )
 
         # ----- Early Stopping -----
@@ -239,13 +221,6 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
 
     # 最良だったエポックのモデルに戻す
     model.load_state_dict(best_model_state)
-
-
-    print("--- 学習完了 ---")
-
-    elapsed_time = time.perf_counter() - start_time
-
-    print(f"処理時間: {elapsed_time:.2f}秒")
 
     return model, best_epoch
 
