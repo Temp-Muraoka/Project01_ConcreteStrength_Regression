@@ -215,7 +215,7 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
 
         # patience回連続で改善しなければ終了
         if patience_counter >= PATIENCE:
-            print(f"\nEarly Stopping: Epoch {epoch + 1}")
+            print(f"Early Stopping: Epoch {epoch + 1}", end="\r", flush=True)
             break
 
 
