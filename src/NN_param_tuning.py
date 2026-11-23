@@ -190,7 +190,11 @@ if __name__=="__main__":
 
     X_train, X_test, Y_train, Y_test = data_load_and_preprocess()
 
+    # Device selection
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+
     
-    Optimize_lightGBM(5, X_train, Y_train)
+    Optimize_NN(5, X_train, Y_train, device)
 
     
