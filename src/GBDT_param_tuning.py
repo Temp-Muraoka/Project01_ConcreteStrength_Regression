@@ -37,13 +37,14 @@ def Optimize_lightGBM(trial_num, X_train, Y_train, CV_num=5):
         # --------------------------------------
         params = {
                     "objective": "regression",
-                    'num_class': Y_train.shape[1],
                     'metric': 'rmse',
                     'boosting_type': 'gbdt',
                     'random_state': RANDOM_STATE,
                     'verbose': -1,
 
                     "n_estimators": 1000,
+
+                    'subsample_freq': 1,
                     
                     # チューニング対象パラメータ（対数変数はキリの良い数値のみ）
                     'learning_rate': trial.suggest_categorical('learning_rate', [0.001, 0.005, 0.01, 0.05, 0.1]),
@@ -114,7 +115,6 @@ def Optimize_lightGBM(trial_num, X_train, Y_train, CV_num=5):
     study = optuna.create_study(
     study_name="subrutin_lgbm_tuning",
     direction="minimize",            # 目的関数（Loss）を最小化
-    pruner=optuna.pruners.MedianPruner()  # 枝刈り用
     )
 
     study.optimize(objective, n_trials=trial_num)
@@ -144,7 +144,12 @@ def Optimize_lightGBM(trial_num, X_train, Y_train, CV_num=5):
     for key, val in best_trial.params.items():
         print(f"  - {key}: {val}")
 
+    # 1. 最適化の履歴
     vis_plt.plot_optimization_history(study)
+    plt.show()
+
+    # 2. パラメータの重要度
+    vis_plt.plot_param_importances(study)
     plt.show()
     
 

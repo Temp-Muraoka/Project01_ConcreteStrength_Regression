@@ -18,13 +18,13 @@ from sklearn.model_selection import KFold
 
 # 自作関数
 from src.Data_load_And_Preprocess import data_load_and_preprocess
-from src.RandomForest_model_train import RadomForest_train
+from src.RandomForest_model_train import RandomForest_train
 
 # Setting
 RANDOM_STATE = 42
 PATIENCE = 5
 
-def Optimize_RndomForest(trial_num, X_train, Y_train, CV_num=5):
+def Optimize_RandomForest(trial_num, X_train, Y_train, CV_num=5):
 
     start_time = time.perf_counter()
 
@@ -50,8 +50,7 @@ def Optimize_RndomForest(trial_num, X_train, Y_train, CV_num=5):
             # 分割の最小サンプル数
             'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
 
-            'max_features': 'sqrt',    # 分割時に考慮する特徴量の数
-            'random_state': 42,        # 乱数シードの固定
+            'random_state': RANDOM_STATE,        # 乱数シードの固定
             'n_jobs': -1               # 全CPUコアを使って高速化
         }
 
@@ -68,7 +67,7 @@ def Optimize_RndomForest(trial_num, X_train, Y_train, CV_num=5):
 
             # 決定木系モデルのため、StandardScaler等のスケーリングは不要（そのまま渡す）
 
-            model = RadomForest_train(params, X_tr, Y_tr)
+            model = RandomForest_train(params, X_tr, Y_tr)
 
 
             # 各データセットに対する予測とメトリクス計算
@@ -108,7 +107,6 @@ def Optimize_RndomForest(trial_num, X_train, Y_train, CV_num=5):
     study = optuna.create_study(
     study_name="subrutin_lgbm_tuning",
     direction="minimize",            # 目的関数（Loss）を最小化
-    pruner=optuna.pruners.MedianPruner()  # 枝刈り用
     )
 
     study.optimize(objective, n_trials=trial_num)
@@ -138,7 +136,12 @@ def Optimize_RndomForest(trial_num, X_train, Y_train, CV_num=5):
     for key, val in best_trial.params.items():
         print(f"  - {key}: {val}")
 
+    # 1. 最適化の履歴
     vis_plt.plot_optimization_history(study)
+    plt.show()
+
+    # 2. パラメータの重要度
+    vis_plt.plot_param_importances(study)
     plt.show()
     
 
@@ -152,6 +155,6 @@ if __name__=="__main__":
     X_train, X_test, Y_train, Y_test = data_load_and_preprocess()
 
     
-    Optimize_RndomForest(5, X_train, Y_train)
+    Optimize_RandomForest(5, X_train, Y_train)
 
     

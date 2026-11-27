@@ -147,7 +147,6 @@ def Optimize_NN(trial_num, X_train, Y_train, device_0, CV_num=5):
     study = optuna.create_study(
     study_name="subrutin_lgbm_tuning",
     direction="minimize",            # 目的関数（Loss）を最小化
-    pruner=optuna.pruners.MedianPruner()  # 枝刈り用
     )
 
     study.optimize(objective, n_trials=trial_num)
@@ -177,7 +176,12 @@ def Optimize_NN(trial_num, X_train, Y_train, device_0, CV_num=5):
     for key, val in best_trial.params.items():
         print(f"  - {key}: {val}")
 
+    # 1. 最適化の履歴
     vis_plt.plot_optimization_history(study)
+    plt.show()
+
+    # 2. パラメータの重要度
+    vis_plt.plot_param_importances(study)
     plt.show()
     
 

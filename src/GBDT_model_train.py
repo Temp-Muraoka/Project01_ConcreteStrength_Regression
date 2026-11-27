@@ -80,6 +80,8 @@ if __name__=="__main__":
                 'verbose': -1,
 
                 "n_estimators": 1000,
+
+                'subsample_freq': 1,
                 
                 # チューニング後のパラメータ
                 'learning_rate': 0.1,
