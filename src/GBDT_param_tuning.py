@@ -156,6 +156,24 @@ def Optimize_lightGBM(trial_num, X_train, Y_train, CV_num=5):
     elapsed_time = time.perf_counter() - start_time
     print(f"処理時間: {elapsed_time:.2f}秒")
 
+    fixed_params = {
+        "objective": "regression",
+        'metric': 'rmse',
+        'boosting_type': 'gbdt',
+        'random_state': RANDOM_STATE,
+        'verbose': -1,        
+        "n_estimators": int(best_epoch),        
+        'subsample_freq': 1,
+    }
+
+    # 探索パラメータと固定パラメータ合体
+    final_params = {**fixed_params, **best_trial.params}
+
+    import json
+
+    with open('results/GBDT/GBDT_best_params.json', 'w') as f:
+        json.dump(final_params, f, indent=4)
+
   
 
 if __name__=="__main__":

@@ -1,0 +1,17 @@
+{
+    "objective": "regression",
+    "metric": "rmse",
+    "boosting_type": "gbdt",
+    "random_state": 42,
+    "verbose": -1,
+    "n_estimators": 135,
+    "subsample_freq": 1,
+    "learning_rate": 0.1,
+    "num_leaves": 67,
+    "max_depth": 10,
+    "min_child_samples": 14,
+    "subsample": 0.97,
+    "colsample_bytree": 0.6799999999999999,
+    "reg_alpha": 0.1,
+    "reg_lambda": 0.01
+}

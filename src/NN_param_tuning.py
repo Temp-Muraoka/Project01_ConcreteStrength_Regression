@@ -53,7 +53,7 @@ def Optimize_NN(trial_num, X_train, Y_train, device_0, CV_num=5):
             prev_dim = dim  # 上限を更新
             
         # ドロップアウト率を決める（例: 0.0〜0.5）
-        drop_rate_trial = trial.suggest_float('drop_rate', 0.0, 0.5, step=0.1)
+        drop_rate_trial = trial.suggest_float('dropout_rate', 0.0, 0.5, step=0.1)
         
         # # 学習率を決める（対数スケール log=True で 1e-4 〜 1e-2 を探す）
         # lr_trial = trial.suggest_float('lr', 1e-4, 1e-2, log=True)
@@ -188,6 +188,30 @@ def Optimize_NN(trial_num, X_train, Y_train, device_0, CV_num=5):
 
     elapsed_time = time.perf_counter() - start_time
     print(f"処理時間: {elapsed_time:.2f}秒")
+
+
+    hidden_dims = []
+    for i in range(best_trial.params["n_layers"]):
+        dim = best_trial.params[f"hidden_dim_{i}"]
+        hidden_dims.append(dim)
+
+    # 最終学習用パラメータを作成
+    params = {
+        "input_dim": X_train.shape[1],
+        "output_dim": Y_train.shape[1],
+        "hidden_layers": hidden_dims,
+        "dropout_rate": best_trial.params["dropout_rate"],
+
+        "epochs": int(best_epoch),
+        "learning_rate": best_trial.params["learning_rate"],
+
+        "device": str(device)
+    }
+
+    import json
+
+    with open('results/NN/NN_best_params.json', 'w') as f:
+        json.dump(params, f, indent=4)
 
   
 

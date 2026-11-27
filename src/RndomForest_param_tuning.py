@@ -36,7 +36,7 @@ def Optimize_RandomForest(trial_num, X_train, Y_train, CV_num=5):
         # 探索したいハイパーパラメータの設定 
         # --------------------------------------
         params = {
-            'n_estimators': 300,       # 決定木の本数
+            'n_estimators': 500,       # 決定木の本数
 
             # 特徴量の選択割合（0.1〜1.0の間で探索）
             'max_features': trial.suggest_float('max_features', 0.1, 1.0),
@@ -111,7 +111,7 @@ def Optimize_RandomForest(trial_num, X_train, Y_train, CV_num=5):
 
     study.optimize(objective, n_trials=trial_num)
 
-    csv_path = "./results/RndomForest/trials_history.csv"
+    csv_path = "./results/RandomForest/trials_history.csv"
 
     # 保存先が存在しない場合、自動作成（上書き注意）
     Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
@@ -147,6 +147,20 @@ def Optimize_RandomForest(trial_num, X_train, Y_train, CV_num=5):
 
     elapsed_time = time.perf_counter() - start_time
     print(f"処理時間: {elapsed_time:.2f}秒")
+
+    fixed_params = {
+            'n_estimators': 500,
+            'random_state': RANDOM_STATE,
+            'n_jobs': -1 
+    }
+
+    # 探索パラメータと固定パラメータ合体
+    final_params = {**fixed_params, **best_trial.params}
+
+    import json
+
+    with open('results/RandomForest/RandomForest_best_params.json', 'w') as f:
+        json.dump(final_params, f, indent=4)
 
   
 
