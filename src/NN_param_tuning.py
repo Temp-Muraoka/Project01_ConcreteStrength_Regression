@@ -57,6 +57,7 @@ def Optimize_NN(trial_num, X_train, Y_train, device_0, CV_num=5):
         
         # # 学習率を決める（対数スケール log=True で 1e-4 〜 1e-2 を探す）
         # lr_trial = trial.suggest_float('lr', 1e-4, 1e-2, log=True)
+        lr_trial = trial.suggest_categorical('learning_rate', [0.0001, 0.0005, 0.001, 0.005, 0.01])
 
         params = {
                     "input_dim": X_train.shape[1],
@@ -65,7 +66,7 @@ def Optimize_NN(trial_num, X_train, Y_train, device_0, CV_num=5):
                     "dropout_rate": drop_rate_trial,
 
                     "epochs": 300,
-                    "learning_rate": 0.001,
+                    "learning_rate": lr_trial,
 
                     "device":device
                     }

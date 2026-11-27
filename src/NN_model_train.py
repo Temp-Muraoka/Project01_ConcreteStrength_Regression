@@ -231,6 +231,10 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
 
 if __name__=="__main__":
 
+    # Device selection
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+
     X_train, X_test, Y_train, Y_test = data_load_and_preprocess()
 
 
@@ -244,38 +248,60 @@ if __name__=="__main__":
                 "dropout_rate": 0.0,
 
                 "epochs": 300,
-                "learning_rate": 0.1,
+                "learning_rate": 0.001,
 
+                "device":device
                 }
 
+    # 標準化
+    scaler_x = StandardScaler()
+    X_train_scaled = scaler_x.fit_transform(X_train)
+    X_test_scaled = scaler_x.transform(X_test)
 
-    model = NN_train(params, X_train, Y_train, X_test, Y_test)
+    scaler_y = StandardScaler()
+    Y_train_scaled = scaler_y.fit_transform(Y_train)
+    Y_test_scaled = scaler_y.transform(Y_test)
 
-    
-    print("--- 学習完了 ---")
+    # Tensorに変換（ここでGPU転送もできるが、データ量多い場合メモリ不足する。ここではbachごと伝送）
+    X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
+    Y_train_tensor = torch.tensor(Y_train_scaled, dtype=torch.float32)
 
-    elapsed_time = time.perf_counter() - start_time
-    print(f"処理時間: {elapsed_time:.2f}秒")
+    X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
+    Y_test_tensor = torch.tensor(Y_test_scaled, dtype=torch.float32)
+
+
+    model, best_epoch = NN_train(params, X_train_tensor, Y_train_tensor, log_disp=True)
 
 
     # ==========================================
     # 学習済みモデルの保存
     # ==========================================
-    model_save_path = "./results/GBDT/GBDT_model.pkl"
+    model_save_path = "./results/NN/NN_model.pth"
 
     # 保存先ディレクトリを自動作成
     Path(model_save_path).parent.mkdir(parents=True, exist_ok=True)
 
-    joblib.dump(
+
+    torch.save(
         {
-            "model": model,
-            "input_dim": X_train.shape[1],
-            "output_dim": Y_train.shape[1],
+            "model_state_dict": model.state_dict(),
+            "input_dim": params["input_dim"],
+            "output_dim": params["output_dim"],
+            "hidden_layers": params["hidden_layers"],
+            "dropout_rate": params["dropout_rate"],
+
+            # X（入力）のスケーラー情報
+            "scaler_x_mean": scaler_x.mean_,
+            "scaler_x_scale": scaler_x.scale_,
+            
+            # Y（出力）のスケーラー情報
+            "scaler_y_mean": scaler_y.mean_,
+            "scaler_y_scale": scaler_y.scale_,
         },
         model_save_path
     )
 
-    print(f"モデルを保存しました: {model_save_path}")
+    print("モデルを保存しました。")
 
     # ==========================================
     # 正解-予測プロット
