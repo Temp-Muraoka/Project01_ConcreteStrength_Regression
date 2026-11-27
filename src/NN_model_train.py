@@ -82,11 +82,16 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
     # DataLoader
     # 入力、出力をペアにする。画像など型が違ってもペアにできる
     train_dataset = TensorDataset(X_train_tensor, Y_train_tensor)
-    test_dataset = TensorDataset(X_test_tensor, Y_test_tensor)
-
+    
     # ミニバッチに分ける（ジェネレータとして使う）。shuffle=True：1epochごとにデータシャッフル
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)   
+    
+    
+    # 注:パラメータ調整後の最終的なモデル学習時は検証データなし
+    if X_test_tensor is not None:
+        test_dataset = TensorDataset(X_test_tensor, Y_test_tensor)
+
+        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     
     # ============================================================
@@ -135,9 +140,6 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
 
         train_loss = 0.0
 
-        all_predictions = []
-        all_targets = []
-
         for batch_X, batch_y in train_loader:
 
             # .to(device) GPU転送　
@@ -170,57 +172,59 @@ def NN_train(params, X_train_tensor, Y_train_tensor, X_test_tensor=None, Y_test_
 
         valid_loss = 0.0
 
-        all_predictions = []
-        all_targets = []
+        # 注:パラメータ調整後の最終的なモデル学習時は検証データなし
+        if X_test_tensor is not None:
 
-        with torch.no_grad():
+            with torch.no_grad():
 
-            for batch_X, batch_y in test_loader:
+                for batch_X, batch_y in test_loader:
 
-                # テストデータも .to(device)
-                batch_X = batch_X.to(device)
-                batch_y = batch_y.to(device)
+                    # テストデータも .to(device)
+                    batch_X = batch_X.to(device)
+                    batch_y = batch_y.to(device)
 
-                outputs = model(batch_X)
+                    outputs = model(batch_X)
 
-                loss = criterion(outputs, batch_y)
+                    loss = criterion(outputs, batch_y)
 
-                valid_loss += loss.item() * batch_X.size(0)
-        
-            valid_mse = valid_loss / len(test_loader.dataset)
-            valid_rmse = valid_mse ** 0.5
-            history["valid_rmse"].append(valid_rmse)
-
-
-        # 10エポックごとに表示
-        if (epoch + 1) % 10 == 0:
-
-            print(
-                f"Epoch [{epoch+1}/{params['epochs']}] "
-                f"Train Loss: {train_rmse:.4f} | "
-                f"Valid Loss: {valid_rmse:.4f} | ", end="\r", flush=True
-            )
-
-        # ----- Early Stopping -----
-        if valid_loss < best_valid_loss - MIN_DELTA:
-
-            best_valid_loss = valid_loss
-            best_model_state = copy.deepcopy(model.state_dict())
-            best_epoch = epoch + 1
-            patience_counter = 0
-
-        else:
-            patience_counter += 1
+                    valid_loss += loss.item() * batch_X.size(0)
+            
+                valid_mse = valid_loss / len(test_loader.dataset)
+                valid_rmse = valid_mse ** 0.5
+                history["valid_rmse"].append(valid_rmse)
 
 
-        # patience回連続で改善しなければ終了
-        if patience_counter >= PATIENCE:
-            print(f"Early Stopping: Epoch {epoch + 1}", end="\r", flush=True)
-            break
+            # ----- Early Stopping -----
+            if valid_loss < best_valid_loss - MIN_DELTA:
+
+                best_valid_loss = valid_loss
+                best_model_state = copy.deepcopy(model.state_dict())
+                best_epoch = epoch + 1
+                patience_counter = 0
+
+            else:
+                patience_counter += 1
+
+            # patience回連続で改善しなければ終了
+            if patience_counter >= PATIENCE:
+                print(f"Early Stopping: Epoch {epoch + 1}", end="\r", flush=True)
+
+                # 最良だったエポックのモデルに戻す
+                model.load_state_dict(best_model_state)
+
+                break
 
 
-    # 最良だったエポックのモデルに戻す
-    model.load_state_dict(best_model_state)
+
+        # # 10エポックごとに表示
+        # if (epoch + 1) % 10 == 0:
+
+        #     print(
+        #         f"Epoch [{epoch+1}/{params['epochs']}] "
+        #         f"Train Loss: {train_rmse:.4f} | "
+        #         f"Valid Loss: {valid_rmse:.4f} | ", end="\r", flush=True
+        #     )
+
 
     return model, best_epoch
 
